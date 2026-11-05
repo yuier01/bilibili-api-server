@@ -1,11 +1,12 @@
-"""视频相关端点。当前只有 BV -> 视频信息。"""
+"""视频相关端点（RPC 风格：路径 = 方法，参数走 JSON body）。"""
 
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 from bilibili_api import video
 
 from ..auth import require_api_key
@@ -31,6 +32,15 @@ STAT_FIELDS = (
 PAGE_FIELDS = ("cid", "page", "part", "duration")
 
 
+class GetVideoInfoRequest(BaseModel):
+    bvid: str = Field(
+        ...,
+        description="BV 号，形如 BV1GJ411x7h7",
+        json_schema_extra={"examples": ["BV1GJ411x7h7"]},
+    )
+    raw: bool = Field(False, description="true 时返回 B 站原始结构（不裁剪）")
+
+
 def _https(url: str | None) -> str | None:
     """B 站封面/头像常返回 http，机器人侧容易被当混流内容拦掉，统一升到 https。"""
     if url and url.startswith("http://"):
@@ -39,10 +49,7 @@ def _https(url: str | None) -> str | None:
 
 
 def _trim(info: dict[str, Any]) -> dict[str, Any]:
-    """只保留稳定字段，避免把上游几百个字段原样甩给机器人。
-
-    需要完整数据时传 ?raw=true。
-    """
+    """只保留稳定字段，避免把上游几百个字段原样甩给机器人。"""
     owner = info.get("owner") or {}
     stat = info.get("stat") or {}
     pages = []
@@ -76,19 +83,17 @@ def _trim(info: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@router.get(
-    "/video/{bvid}",
+@router.post(
+    "/video/get_info",
     summary="按 BV 号查询视频信息",
-    description="返回裁剪后的稳定字段；`raw=true` 时返回 B 站原始结构。",
+    description=(
+        "参数全部走 JSON body。默认返回裁剪后的稳定字段，`raw=true` 返回上游原始结构。"
+    ),
 )
-async def get_video(
-    bvid: str,
-    request: Request,
-    raw: bool = Query(False, description="返回上游原始 JSON"),
-) -> dict[str, Any]:
-    if not BVID_PATTERN.match(bvid):
+async def get_video_info(payload: GetVideoInfoRequest, request: Request) -> dict[str, Any]:
+    if not BVID_PATTERN.match(payload.bvid):
         raise ServiceError(422, "INVALID_BVID", "BV 号格式不合法，应形如 BV1GJ411x7h7")
 
-    video_obj = video.Video(bvid=bvid)
+    video_obj = video.Video(bvid=payload.bvid)
     data = await request.app.state.gate.run(video_obj.get_info)
-    return envelope(request, data if raw else _trim(data))
+    return envelope(request, data if payload.raw else _trim(data))

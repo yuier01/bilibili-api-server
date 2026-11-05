@@ -1,4 +1,4 @@
-"""元信息 / 健康检查。"""
+"""元信息 / 健康检查。同样遵循全 POST 约定。"""
 
 from __future__ import annotations
 
@@ -12,12 +12,16 @@ from ..auth import require_api_key
 router = APIRouter(tags=["meta"])
 
 
-@router.get("/healthz", summary="存活检查（不需要鉴权，给容器 healthcheck 用）")
+@router.post("/healthz", summary="存活检查（不需要鉴权，给容器 healthcheck 用）")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/v1/meta", dependencies=[Depends(require_api_key)], summary="服务与 SDK 状态")
+@router.post(
+    "/v1/meta",
+    dependencies=[Depends(require_api_key)],
+    summary="服务与 SDK 状态",
+)
 async def meta(request: Request) -> dict:
     app = request.app
     client_name, _ = get_selected_client()

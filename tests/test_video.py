@@ -9,7 +9,7 @@ VIEW_DATA = {
     "aid": 80433022,
     "title": "【官方 MV】Never Gonna Give You Up - Rick Astley",
     "desc": "经典永流传",
-    "pic": "https://i0.hdslb.com/bfs/archive/cover.jpg",
+    "pic": "http://i0.hdslb.com/bfs/archive/cover.jpg",
     "duration": 213,
     "pubdate": 1576500000,
     "ctime": 1576500000,
@@ -17,7 +17,7 @@ VIEW_DATA = {
     "tname": "日常",
     "copyright": 1,
     "state": 0,
-    "owner": {"mid": 946974, "name": "索尼音乐中国", "face": "https://i0.hdslb.com/bfs/face/a.jpg"},
+    "owner": {"mid": 946974, "name": "索尼音乐中国", "face": "http://i0.hdslb.com/bfs/face/a.jpg"},
     "stat": {
         "view": 108042966,
         "danmaku": 12345,
@@ -30,7 +30,13 @@ VIEW_DATA = {
         "now_rank": 0,
     },
     "pages": [
-        {"cid": 137649199, "page": 1, "part": "MV", "duration": 213, "width": 1920, "height": 1080}
+        {
+            "cid": 137649199,
+            "page": 1,
+            "part": "MV",
+            "duration": 213,
+            "dimension": {"width": 1920, "height": 1080, "rotate": 0},
+        }
     ],
 }
 
@@ -47,7 +53,7 @@ def mock_view(payload: dict | None = None, code: int = 0) -> None:
 @respx.mock
 async def test_video_info_ok(client):
     mock_view()
-    response = await client.get("/v1/video/BV1GJ411x7h7")
+    response = await client.post("/v1/video/get_info", json={"bvid": "BV1GJ411x7h7"})
 
     assert response.status_code == 200
     body = response.json()
@@ -58,16 +64,21 @@ async def test_video_info_ok(client):
     data = body["data"]
     assert data["bvid"] == "BV1GJ411x7h7"
     assert data["title"].startswith("【官方 MV】")
-    assert data["cover"].endswith("cover.jpg")
     assert data["owner"]["name"] == "索尼音乐中国"
     assert data["stat"]["view"] == 108042966
     assert data["pages"][0]["cid"] == 137649199
+    # 封面/头像统一升 https，尺寸从 dimension 拍平
+    assert data["cover"] == "https://i0.hdslb.com/bfs/archive/cover.jpg"
+    assert data["owner"]["face"].startswith("https://")
+    assert data["pages"][0]["width"] == 1920
 
 
 @respx.mock
 async def test_raw_returns_upstream_shape(client):
     mock_view()
-    response = await client.get("/v1/video/BV1GJ411x7h7", params={"raw": "true"})
+    response = await client.post(
+        "/v1/video/get_info", json={"bvid": "BV1GJ411x7h7", "raw": True}
+    )
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -76,7 +87,7 @@ async def test_raw_returns_upstream_shape(client):
 
 
 async def test_invalid_bvid(client):
-    response = await client.get("/v1/video/BV123")
+    response = await client.post("/v1/video/get_info", json={"bvid": "BV123"})
 
     assert response.status_code == 422
     body = response.json()
@@ -84,10 +95,24 @@ async def test_invalid_bvid(client):
     assert body["request_id"]
 
 
+async def test_missing_bvid_is_validation_error(client):
+    response = await client.post("/v1/video/get_info", json={})
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "BAD_REQUEST"
+
+
+async def test_get_method_not_allowed(client):
+    response = await client.get("/v1/video/get_info")
+
+    assert response.status_code == 405
+    assert response.json()["code"] == "HTTP_ERROR"
+
+
 @respx.mock
 async def test_upstream_not_found(client):
     mock_view(code=-404)
-    response = await client.get("/v1/video/BV1GJ411x7h7")
+    response = await client.post("/v1/video/get_info", json={"bvid": "BV1GJ411x7h7"})
 
     assert response.status_code == 404
     body = response.json()
@@ -98,7 +123,7 @@ async def test_upstream_not_found(client):
 @respx.mock
 async def test_risk_control_maps_to_503(client):
     mock_view(code=-412)
-    response = await client.get("/v1/video/BV1GJ411x7h7")
+    response = await client.post("/v1/video/get_info", json={"bvid": "BV1GJ411x7h7"})
 
     assert response.status_code == 503
     assert response.json()["code"] == "RISK_CONTROL"
@@ -109,17 +134,27 @@ async def test_risk_control_maps_to_503(client):
 async def test_api_key_required(client, api_key):
     mock_view()
 
-    unauthorized = await client.get("/v1/video/BV1GJ411x7h7")
+    unauthorized = await client.post("/v1/video/get_info", json={"bvid": "BV1GJ411x7h7"})
     assert unauthorized.status_code == 401
     assert unauthorized.json()["code"] == "UNAUTHORIZED"
 
-    authorized = await client.get(
-        "/v1/video/BV1GJ411x7h7", headers={"X-API-Key": api_key}
+    authorized = await client.post(
+        "/v1/video/get_info",
+        json={"bvid": "BV1GJ411x7h7"},
+        headers={"X-API-Key": api_key},
     )
     assert authorized.status_code == 200
 
 
 async def test_healthz_is_open(client):
-    response = await client.get("/healthz")
+    response = await client.post("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+async def test_meta(client):
+    response = await client.post("/v1/meta")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sdk_version"] == "17.4.1"
+    assert body["client"] == "httpx"
