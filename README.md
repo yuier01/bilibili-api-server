@@ -29,9 +29,27 @@ POST /v1/live/get_room_info  {"room_id": 22637261}
 
 ```powershell
 cd bilibili-api-server\dev
-uv sync                      # 建 .venv，并以 editable 方式装本地 SDK（../../bilibili-api）
+uv sync                       # 建 .venv、以 editable 装本地 SDK、把本项目装成可执行命令
+uv run bilibili-api-server    # 默认监听 127.0.0.1:8000
+```
+
+常用参数（不传就取 `BILI_*` 环境变量或 `.env`）：
+
+```powershell
+uv run bilibili-api-server --port 8010          # 换端口
+uv run bilibili-api-server --reload             # 开发模式，改代码自动重启
+uv run bilibili-api-server --host 0.0.0.0 --log-level debug
+```
+
+也可以继续用 uvicorn 直接起：
+
+```powershell
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+> 为什么 `uv run bilibili-api-server` 能跑：`pyproject.toml` 里有 `[build-system]` 和
+> `[project.scripts]`，`uv sync` 会把**项目本身**装进 venv 并生成 `bilibili-api-server` 命令。
+> 不需要把 `uv` 写进 `dependencies` —— 它是运行器，不是运行库。
 
 打开 <http://127.0.0.1:8000/docs> 看自动生成的接口文档。
 
@@ -163,6 +181,7 @@ uv run pytest -q
 dev/
 ├── app/
 │   ├── main.py           # 装配、lifespan
+│   ├── cli.py            # 命令行入口（uv run bilibili-api-server）
 │   ├── config.py         # pydantic-settings
 │   ├── auth.py           # X-API-Key（constant-time 比较）
 │   ├── errors.py         # SDK 异常 -> HTTP 状态码/业务码

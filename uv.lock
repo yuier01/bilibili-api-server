@@ -100,7 +100,7 @@ requires-dist = [
 [[package]]
 name = "bilibili-api-server-dev"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "bilibili-api-python" },
     { name = "fastapi" },

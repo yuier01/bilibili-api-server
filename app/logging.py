@@ -33,13 +33,20 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
-def setup_logging(level: str = "INFO") -> None:
-    # Windows 控制台默认 GBK，日志里的中文会乱码；统一成 UTF-8
+def force_utf8_stdio() -> None:
+    """Windows 控制台默认 GBK，中文会乱码；统一成 UTF-8。
+
+    CLI 的 argparse 帮助文本、日志都依赖这一步。
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
         except (AttributeError, ValueError):
             pass
+
+
+def setup_logging(level: str = "INFO") -> None:
+    force_utf8_stdio()
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())

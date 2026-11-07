@@ -11,12 +11,24 @@ dependencies = [
     "bilibili-api-python==17.4.1",
 ]
 
+[project.scripts]
+# uv run bilibili-api-server --port 8000
+bilibili-api-server = "app.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "respx>=0.21",
 ]
+
+# 让 uv 把本项目也装进 venv（否则 [project.scripts] 不会生成命令）
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 # 用本地 SDK 源码，保证行为和 bilibili-api/ 下的代码一致
 [tool.uv.sources]
