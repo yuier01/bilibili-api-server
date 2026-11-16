@@ -29,8 +29,16 @@ POST /v1/live/get_room_info  {"room_id": 22637261}
 
 ```powershell
 cd bilibili-api-server\dev
-uv sync                       # 建 .venv、以 editable 装本地 SDK、把本项目装成可执行命令
+uv sync                       # 建 .venv、从 PyPI 装 SDK 17.4.1、把本项目装成可执行命令
 uv run bilibili-api-server    # 默认监听 127.0.0.1:8000
+```
+
+服务器上（Linux/Docker）同样只要这一份仓库，**不需要**旁边有 `bilibili-api/` 源码：
+
+```bash
+git clone <repo> && cd <repo>
+uv sync
+uv run bilibili-api-server --host 0.0.0.0 --port 8000
 ```
 
 常用参数（不传就取 `BILI_*` 环境变量或 `.env`）：
@@ -59,10 +67,13 @@ curl -X POST http://127.0.0.1:8000/v1/video/get_info `
   -d '{"bvid":"BV1GJ411x7h7"}'
 ```
 
-> 如果不用 uv：`python -m venv .venv` → 激活 → `pip install -e ../../bilibili-api` →
+> 如果不用 uv：`python -m venv .venv` → 激活 → `pip install -e .` →
 > `pip install fastapi "uvicorn[standard]" pydantic-settings httpx`。
 > 注意 **`httpx` 必须显式安装**：它不在 SDK 的 `pyproject` 依赖里（只在 `requirements.txt`），
 > 缺了会在首次请求时报 `ArgsException: 尚未安装第三方请求库`。
+>
+> 想用本地 `bilibili-api/` 源码调试（而不是 PyPI 版本）：`uv pip install -e ../../bilibili-api`。
+> 这是本地覆盖，不进 `uv.lock`，下一次 `uv sync` 会换回锁文件里的版本。
 
 ## 配置
 

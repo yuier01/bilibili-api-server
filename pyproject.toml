@@ -30,9 +30,13 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
-# 用本地 SDK 源码，保证行为和 bilibili-api/ 下的代码一致
-[tool.uv.sources]
-bilibili-api-python = { path = "../../bilibili-api", editable = true }
+# 默认从 PyPI 装 17.4.1：服务器上只 clone 本仓库即可，不依赖旁边有没有 SDK 源码。
+# 如果本地想用 bilibili-api/ 的源码（改 SDK 时调试用），不要改这里，改成：
+#   uv pip install -e ../../bilibili-api
+# 注意下一次 `uv sync` 会把它换回锁文件里的版本。
+#
+# [tool.uv.sources]
+# bilibili-api-python = { path = "../../bilibili-api", editable = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
