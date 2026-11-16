@@ -13,7 +13,7 @@ from .errors import install_error_handlers
 from .gate import Gate
 from .logging import setup_logging
 from .middleware import RequestContextMiddleware
-from .routers import meta, video
+from .routers import common, meta, video
 from .sdk import configure_sdk, shutdown_sdk
 
 log = logging.getLogger("app")
@@ -57,3 +57,4 @@ install_error_handlers(app)
 
 app.include_router(meta.router)
 app.include_router(video.router)
+app.include_router(common.router)

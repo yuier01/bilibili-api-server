@@ -139,6 +139,35 @@ curl -X POST http://127.0.0.1:8000/v1/video/get_info `
 - 每次响应带 `X-Request-ID` 与 `X-Elapsed-MS` 头，和响应体里的 `request_id` 一致，便于对日志。
 - 请求体可以是空对象 `{}`，此时返回 422 `BAD_REQUEST`（字段校验失败）。
 
+### `POST /v1/common/parse_url`
+
+把用户发来的任意 B 站分享内容解析成资源标识，方便机器人统一入口处理。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `url` | string | 是 | 分享文案 / b23.tv 短链 / B 站长链 / 裸 BV·av·ep·ss·cv 号 |
+
+支持的输入：
+
+| 输入 | 输出 |
+|---|---|
+| `https://b23.tv/me5NG2c` | `{"type":"video","bvid":"BV1Qc411h7Ys","url":"..."}` |
+| `【标题】 https://b23.tv/me5NG2c 快看` | 同上（自动从文案里抠链接） |
+| `b23.tv/me5NG2c`（无协议头） | 同上 |
+| `BV1GJ411x7h7` / `av80433022` | video（`bvid` / `aid`） |
+| `.../bangumi/play/ep123` / `ss123` | bangumi（`ep_id` / `season_id`） |
+| `https://live.bilibili.com/22637261` | live（`room_id`） |
+| `https://space.bilibili.com/2` | user（`uid`） |
+| `.../read/cv123` | article（`cv_id`） |
+| `https://t.bilibili.com/123` | dynamic（`dynamic_id`） |
+
+实现上的两个要点：
+
+- 短链只发**一次 HEAD 到 b23.tv** 读 `Location`，`allow_redirects=False`——**不会**跟到 bilibili.com，避免白发一次请求还吃一个 412。
+- 过期/无效短链返回 422 `UNPARSEABLE_URL`；路径不认识的 B 站链接同样 422，不会瞎猜。
+
 ### 其它
 
 - `POST /healthz` — 存活检查，不需要鉴权（容器 healthcheck 记得用 `-X POST`）。
@@ -152,6 +181,8 @@ HTTP 状态码 + 稳定业务码，调用方判断这两层即可：
 |---|---|---|
 | `INVALID_BVID` | 422 | BV 号格式不对（本地校验，不打上游） |
 | `BAD_REQUEST` | 422 | 请求体缺字段/类型不对（pydantic 校验） |
+| `INVALID_URL` | 422 | 输入里没有可识别的链接或 ID |
+| `UNPARSEABLE_URL` | 422 | 短链无跳转目标（过期），或链接路径不认识 |
 | `UNAUTHORIZED` | 401 | 缺少/错误的 `X-API-Key` |
 | `NOT_FOUND` | 404 | 上游 `-404`（视频不存在/已删除） |
 | `WBI_REJECTED` | 502 | 上游 `-403`，wbi 重试后仍失败 |
@@ -173,7 +204,7 @@ HTTP 状态码 + 稳定业务码，调用方判断这两层即可：
 uv run pytest -q
 ```
 
-用 `respx` 把上游完全 mock 掉，测试不碰真实 B 站；覆盖成功、`raw`、非法 BV、缺字段、`GET` 被拒、`-404`、`-412`、鉴权、健康检查、meta。
+用 `respx` 把上游完全 mock 掉，测试不碰真实 B 站；覆盖成功、`raw`、非法 BV、缺字段、`GET` 被拒、`-404`、`-412`、鉴权、健康检查、meta，以及 `parse_url` 的各种输入（短链/文案/长链/裸号/过期链）。
 
 ## 目录结构
 
@@ -186,22 +217,25 @@ dev/
 │   ├── auth.py           # X-API-Key（constant-time 比较）
 │   ├── errors.py         # SDK 异常 -> HTTP 状态码/业务码
 │   ├── gate.py           # 上游并发上限 + 超时
+│   ├── links.py          # 分享文案/短链/长链/裸号 -> 资源标识（纯函数）
 │   ├── logging.py        # JSON 行日志（Windows 下强制 UTF-8）
 │   ├── middleware.py     # request_id / 耗时 / 访问日志
 │   ├── sdk.py            # SDK 全局设置（一次性）
 │   ├── schemas.py        # 响应包
 │   └── routers/
 │       ├── meta.py       # POST /healthz, POST /v1/meta
-│       └── video.py      # POST /v1/video/get_info
+│       ├── video.py      # POST /v1/video/get_info
+│       └── common.py     # POST /v1/common/parse_url
 └── tests/
     ├── conftest.py       # 跑完整 lifespan + 关掉 auto buvid
-    └── test_video.py
+    ├── test_video.py
+    └── test_common.py
 ```
 
 ## 已知限制 / 下一步
 
 - **首次请求会慢**：进程启动后的第一次调用会多打两次上游（`x/frontend/finger/spi` 取 buvid、`ExClimbWuzhi` 激活），约 300–400ms；之后单次约 100ms。这是 SDK 的匿名设备指纹初始化，进程内只发生一次。
-- 只有视频信息一个方法；播放地址、弹幕、用户、直播按 PLAN.md §7 逐步加。
+- 目前只有 `video/get_info` 和 `common/parse_url` 两个方法；播放地址、弹幕、用户、直播按 PLAN.md §7 逐步加。
 - **没有缓存**（连单飞也没有）：并发打同一个 BV 会各自打一次上游。按 PLAN.md §6.3，第一版可以先不缓存，等命中率数据出来再说。
 - **没有熔断**：连续 `-412` 不会自我冷却，只有 SDK 的 wbi 重试（`-403`）。
 - 匿名模式：`playurl` 清晰度受限、历史弹幕/关注列表等需要登录的方法不可用。
