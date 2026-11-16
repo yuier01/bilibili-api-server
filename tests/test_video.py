@@ -1,6 +1,7 @@
 import httpx
 import pytest
 import respx
+from bilibili_api import BILIBILI_API_VERSION
 
 VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
 
@@ -156,5 +157,6 @@ async def test_meta(client):
     response = await client.post("/v1/meta")
     assert response.status_code == 200
     body = response.json()
-    assert body["sdk_version"] == "17.4.1"
+    # 不写死版本号：跟随锁文件，升级 SDK 时这个测试不该失败
+    assert body["sdk_version"] == BILIBILI_API_VERSION
     assert body["client"] == "httpx"

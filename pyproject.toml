@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.4",
     "httpx>=0.27",
-    "bilibili-api-python==17.4.1",
+    "bilibili-api-python==17.4.2",
 ]
 
 [project.scripts]
@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
-# 默认从 PyPI 装 17.4.1：服务器上只 clone 本仓库即可，不依赖旁边有没有 SDK 源码。
+# 默认从 PyPI 装 17.4.2：服务器上只 clone 本仓库即可，不依赖旁边有没有 SDK 源码。
 # 如果本地想用 bilibili-api/ 的源码（改 SDK 时调试用），不要改这里，改成：
 #   uv pip install -e ../../bilibili-api
 # 注意下一次 `uv sync` 会把它换回锁文件里的版本。

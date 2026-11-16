@@ -1,6 +1,6 @@
 # bilibili-api-server (dev)
 
-基于 [`bilibili-api`](../../bilibili-api)（17.4.1）的最小可用 B 站只读接口服务。
+基于 [`bilibili-api`](../../bilibili-api)（PyPI `bilibili-api-python` 17.4.2）的最小可用 B 站只读接口服务。
 当前只交付一个方法：**按 BV 号查询视频信息**，匿名即可用，不需要任何 cookie。
 
 设计细节见上级目录的 [PLAN.md](../PLAN.md)。
@@ -29,7 +29,7 @@ POST /v1/live/get_room_info  {"room_id": 22637261}
 
 ```powershell
 cd bilibili-api-server\dev
-uv sync                       # 建 .venv、从 PyPI 装 SDK 17.4.1、把本项目装成可执行命令
+uv sync                       # 建 .venv、从 PyPI 装 SDK 17.4.2、把本项目装成可执行命令
 uv run bilibili-api-server    # 默认监听 127.0.0.1:8000
 ```
 
